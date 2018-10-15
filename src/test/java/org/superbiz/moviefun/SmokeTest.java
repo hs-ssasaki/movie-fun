@@ -6,6 +6,7 @@ import org.springframework.web.client.RestTemplate;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+
 public class SmokeTest {
 
     @Test
@@ -16,7 +17,7 @@ public class SmokeTest {
 
         assertThat(homePage, containsString("Please select one of the following links:"));
 
-        String setupPage = restTemplate.getForObject(url("/setup.jsp"), String.class);
+        String setupPage = restTemplate.getForObject(url("/setup"), String.class);
 
         assertThat(setupPage, containsString("Wedding Crashers"));
         assertThat(setupPage, containsString("Starsky & Hutch"));
