@@ -18,6 +18,7 @@ package org.superbiz.moviefun;
 
 import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionOperations;
 import org.superbiz.moviefun.movies.Movie;
 import org.superbiz.moviefun.movies.MoviesBean;
 
@@ -36,6 +37,14 @@ import java.util.List;
 public class ActionServlet extends HttpServlet {
 
     private static final long serialVersionUID = -5832176047021911038L;
+
+    TransactionOperations moviesTransactionOperations;
+    TransactionOperations albumsTransactionOperations;
+
+    public ActionServlet(TransactionOperations moviesTransactionOperations, TransactionOperations albumsTransactionOperations) {
+        this.moviesTransactionOperations = moviesTransactionOperations;
+        this.albumsTransactionOperations = albumsTransactionOperations;
+    }
 
     public static int PAGE_SIZE = 5;
 
@@ -65,7 +74,10 @@ public class ActionServlet extends HttpServlet {
 
             Movie movie = new Movie(title, director, genre, rating, year);
 
-            moviesBean.addMovie(movie);
+            moviesTransactionOperations.execute(status -> {
+                moviesBean.addMovie(movie);
+                return null;
+            });
             response.sendRedirect("moviefun");
             return;
 
