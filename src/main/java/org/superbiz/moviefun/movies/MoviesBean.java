@@ -19,12 +19,6 @@ package org.superbiz.moviefun.movies;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-<<<<<<< HEAD:src/main/java/org/superbiz/moviefun/MoviesBean.java
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
-=======
->>>>>>> two-data-source-end:src/main/java/org/superbiz/moviefun/movies/MoviesBean.java
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.TypedQuery;
