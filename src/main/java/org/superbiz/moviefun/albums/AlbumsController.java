@@ -1,33 +1,34 @@
 package org.superbiz.moviefun.albums;
 
-import org.apache.tika.Tika;
+import org.apache.tika.io.IOUtils;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.superbiz.moviefun.blobstore.Blob;
+import org.superbiz.moviefun.blobstore.BlobStore;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Map;
 
-import static java.lang.ClassLoader.getSystemResource;
+import java.util.Map;
+import java.util.Optional;
+
 import static java.lang.String.format;
-import static java.nio.file.Files.readAllBytes;
 
 @Controller
 @RequestMapping("/albums")
 public class AlbumsController {
 
     private final AlbumsBean albumsBean;
+    private BlobStore blobStore;
+    private final String blobNamePrefix = "image";
 
-    public AlbumsController(AlbumsBean albumsBean) {
+    public AlbumsController(AlbumsBean albumsBean, BlobStore blobStore) {
         this.albumsBean = albumsBean;
+        this.blobStore = blobStore;
     }
 
 
@@ -45,55 +46,72 @@ public class AlbumsController {
 
     @PostMapping("/{albumId}/cover")
     public String uploadCover(@PathVariable long albumId, @RequestParam("file") MultipartFile uploadedFile) throws IOException {
-        saveUploadToFile(uploadedFile, getCoverFile(albumId));
-
+        saveUploadToFile(albumId, uploadedFile, getCoverFile(albumId));
         return format("redirect:/albums/%d", albumId);
     }
 
     @GetMapping("/{albumId}/cover")
     public HttpEntity<byte[]> getCover(@PathVariable long albumId) throws IOException, URISyntaxException {
-        Path coverFilePath = getExistingCoverPath(albumId);
-        byte[] imageBytes = readAllBytes(coverFilePath);
-        HttpHeaders headers = createImageHttpHeaders(coverFilePath, imageBytes);
+        Optional<Blob> blob = blobStore.get(format(blobNamePrefix + "/%d", albumId));
+        Blob imageBlob = blob.orElseGet(this::buildDefaultImageName);
+
+        byte[] imageBytes = IOUtils.toByteArray(imageBlob.inputStream);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(imageBlob.contentType));
+        headers.setContentLength(imageBytes.length);
 
         return new HttpEntity<>(imageBytes, headers);
     }
 
-
-    private void saveUploadToFile(@RequestParam("file") MultipartFile uploadedFile, File targetFile) throws IOException {
-        targetFile.delete();
-        targetFile.getParentFile().mkdirs();
-        targetFile.createNewFile();
-
-        try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
-            outputStream.write(uploadedFile.getBytes());
-        }
+    @DeleteMapping("/covers")
+    public String deleteCovers() {
+        blobStore.deleteAll();
+        return "redirect:/albums";
     }
 
-    private HttpHeaders createImageHttpHeaders(Path coverFilePath, byte[] imageBytes) throws IOException {
-        String contentType = new Tika().detect(coverFilePath);
+    private Blob buildDefaultImageName() {
+        ClassLoader classLoader = getClass().getClassLoader();
+        InputStream input = classLoader.getResourceAsStream("default-cover.jpg");
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.parseMediaType(contentType));
-        headers.setContentLength(imageBytes.length);
-        return headers;
+        return new Blob("default-cover", input, MediaType.IMAGE_JPEG_VALUE);
     }
 
+
+    private void saveUploadToFile(long albumId, @RequestParam("file") MultipartFile uploadedFile, File targetFile) throws IOException {
+        Blob blob = new Blob(
+                format(blobNamePrefix + "/%d", albumId),
+                uploadedFile.getInputStream(),
+                uploadedFile.getContentType()
+        );
+
+        blobStore.put(blob);
+    }
+
+//    private HttpHeaders createImageHttpHeaders(Path coverFilePath, byte[] imageBytes) throws IOException {
+//        String contentType = new Tika().detect(coverFilePath);
+//
+//        HttpHeaders headers = new HttpHeaders();
+//        headers.setContentType(MediaType.parseMediaType(contentType));
+//        headers.setContentLength(imageBytes.length);
+//        return headers;
+//    }
+//
     private File getCoverFile(@PathVariable long albumId) {
-        String coverFileName = format("covers/%d", albumId);
+        String coverFileName = format(blobNamePrefix + "/%d", albumId);
         return new File(coverFileName);
     }
 
-    private Path getExistingCoverPath(@PathVariable long albumId) throws URISyntaxException {
-        File coverFile = getCoverFile(albumId);
-        Path coverFilePath;
-
-        if (coverFile.exists()) {
-            coverFilePath = coverFile.toPath();
-        } else {
-            coverFilePath = Paths.get(getSystemResource("default-cover.jpg").toURI());
-        }
-
-        return coverFilePath;
-    }
+//    private Path getExistingCoverPath(@PathVariable long albumId) throws URISyntaxException {
+//        File coverFile = getCoverFile(albumId);
+//        Path coverFilePath;
+//
+//        if (coverFile.exists()) {
+//            coverFilePath = coverFile.toPath();
+//        } else {
+//            coverFilePath = Paths.get(getSystemResource("default-cover.jpg").toURI());
+//        }
+//
+//        return coverFilePath;
+//    }
 }
